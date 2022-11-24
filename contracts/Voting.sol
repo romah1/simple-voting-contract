@@ -7,7 +7,7 @@ import "hardhat/console.sol";
 
 contract Voting {
   event ProposalCreated(
-    uint256 proposalId,
+    uint256 id,
     bytes32 message,
     address owner,
     uint256 voteStart,
@@ -15,10 +15,25 @@ contract Voting {
   );
 
   event ProposalExecuted(
+    uint256 id,
     bytes32 message,
-    address proposalOwner,
+    address owner,
+    uint256 votesFor,
+    uint256 votesAgainst,
+    uint256 voteStart,
+    uint256 voteEnd,
     address executor,
     bool success
+  );
+
+  event ProposalDiscarded(
+    uint256 id,
+    bytes32 message,
+    address owner,
+    uint256 votesFor,
+    uint256 votesAgainst,
+    uint256 voteStart,
+    uint256 voteEnd
   );
 
   struct Proposal {
@@ -38,7 +53,7 @@ contract Voting {
   IVotes public token;
   mapping(uint => Proposal) public proposals;
   mapping(uint256 => mapping(address => bool)) votedForProposal;
-  uint256[] public proposalIds;
+  uint256[] public activeProposals;
   uint256 public latestProposalId;
 
   constructor(IVotes _token) {
@@ -55,10 +70,15 @@ contract Voting {
     return (proposal.id, proposal.message, proposal.owner, proposal.votesFor, proposal.votesAgainst, proposal.voteStart, proposal.voteEnd);
   }
 
+  function isProposalAlive(uint256 proposalId) public view returns (bool) {
+    Proposal memory proposal = proposals[proposalId];
+    return proposal.voteStart <= block.number && block.number < proposal.voteEnd;
+  }
+
   function propose(bytes32 message) public returns (uint256) {
     removeOldestProposalIfNeeded();
 
-    require(proposalIds.length < MaxProposalsAllowed, "Max amount of proposals is already reached");
+    require(activeProposals.length < MaxProposalsAllowed, "Max amount of proposals is already reached");
 
     uint256 proposalId = ++latestProposalId;
 
@@ -74,7 +94,7 @@ contract Voting {
     proposal.message = message;
     proposal.id = proposalId;
 
-    proposalIds.push(proposalId);
+    activeProposals.push(proposalId);
 
     emit ProposalCreated(
       proposalId,
@@ -111,8 +131,8 @@ contract Voting {
       return;
     }
 
-    for (uint i = 0; i < proposalIds.length; ++i) {
-      if (proposalIds[i] == proposal.id) {
+    for (uint i = 0; i < activeProposals.length; ++i) {
+      if (activeProposals[i] == proposal.id) {
         removeProposalByIdx(i);
 
         bool success;
@@ -123,8 +143,13 @@ contract Voting {
         }
 
         emit ProposalExecuted(
+          proposal.id,
           proposal.message,
           proposal.owner,
+          proposal.votesFor,
+          proposal.votesAgainst,
+          proposal.voteStart,
+          proposal.voteEnd,
           msg.sender,
           success
         );
@@ -132,29 +157,35 @@ contract Voting {
         return;
       }
     }
-    revert("Failed to find proposalId in proposalIds array");
+    revert("Failed to find proposalId in activeProposals array");
   }
 
   function removeOldestProposalIfNeeded() private {
-    if (proposalIds.length == 0) {
+    if (activeProposals.length == 0) {
       return;
     }
 
-    for (uint i = 0; i < proposalIds.length; ++i) {
-      if (!isProposalAlive(proposalIds[i])) {
+    for (uint i = 0; i < activeProposals.length; ++i) {
+      uint256 proposalId = activeProposals[i];
+      if (!isProposalAlive(proposalId)) {
         removeProposalByIdx(i);
+        Proposal memory proposal = proposals[proposalId];
+        emit ProposalDiscarded(
+          proposal.id,
+          proposal.message,
+          proposal.owner,
+          proposal.votesFor,
+          proposal.votesAgainst,
+          proposal.voteStart,
+          proposal.voteEnd
+        );
         return;
       }
     }
   }
 
   function removeProposalByIdx(uint256 idx) private {
-    proposalIds[idx] = proposalIds[0];
-    proposalIds.pop();
-  }
-
-  function isProposalAlive(uint256 proposalId) private view returns (bool) {
-    Proposal memory proposal = proposals[proposalId];
-    return proposal.voteStart <= block.number && block.number < proposal.voteEnd;
+    activeProposals[idx] = activeProposals[0];
+    activeProposals.pop();
   }
 }
