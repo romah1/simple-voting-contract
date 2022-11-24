@@ -6,7 +6,7 @@ By default only `3` proposals can be alive at a time. When adding a new proposal
 
 `Voting` contract uses `ERC20` tokens with `ERC20Votes` extension to represent voting power
 
-Proposal is simple `bytes32` message that can be accepted, discarded or rejected depending on amount of votes. Proposal time to live is `3 days`. After this time period proposal may be discarded if votes limit was not reached
+Proposal is simple `bytes32` message that can be accepted, rejected or discarded depending on amount of votes. Proposal time to live is `3 days`. After this time period proposal may be discarded if votes limit was not reached
 
 # `Voting` contract
 ## Main functons
@@ -14,12 +14,12 @@ Proposal is simple `bytes32` message that can be accepted, discarded or rejected
 2. `vote(uint256 proposalId, bool isFor)`. Votes for or against the proposal with voting power equal `token.getPastVotes(msg.sender, proposal.voteStart)`. Reverts if proposal with such id does not exist or address has already voted for it
 ## Events
   1. `ProposalCreated` is emitted on successfull `propose(...)` call
-  2. `ProposalExecuted` is emitted when `votesFor * 2 > tokenSupply` or `votesAgainst * 2 > tokenSupply`
+  2. `ProposalExecuted` is emitted when `votesFor * 2 > tokenSupply` or `votesAgainst * 2 > tokenSupply` on successfull `vote(...)` call
   3. `ProposalDiscarded` is emitted when outdated proposal is discarded
   4. `VoteSubmitted` is emitted on successfull `vote(...)` call
 
 # `VotingToken` contract
-It is token which can be used as voting token for `Voting` contract
+Token which can be used as voting token for `Voting` contract
 
 # Tests
 
@@ -30,7 +30,6 @@ npx hardhat test
 ## Example output:
 ```
 ➜  simple_voting_contract git:(master) ✗ npx hardhat test
-
 
   Voting
     Deployment
@@ -52,7 +51,4 @@ npx hardhat test
       ✔ ProposalExecuted event with success:false should be emmited when reached enough votesAgainst (49ms)
       ✔ VoteSubmitted event should be emited on successfull vote for call
       ✔ VoteSubmitted event should be emited on successfull vote against call
-
-
-  16 passing (1s)
 ```
