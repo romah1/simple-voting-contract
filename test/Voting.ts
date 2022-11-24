@@ -129,7 +129,7 @@ describe("Voting", function () {
   });
 
   describe("vote(...) function", function () {
-    it("vote(..., true) increase votes correctly", async function () {
+    it("vote(..., true) should increase votes correctly", async function () {
       const {otherAccount, voting, votingToken, votingTokenSupply, owner} = await loadFixture(deployVotingAndTokenFixture);
       const message = hashProposalMessage("hello world");
       
@@ -146,7 +146,7 @@ describe("Voting", function () {
       expect(votesFor).to.equals(otherAccountVotes);
     });
 
-    it("vote(..., false) decrease votes correctly", async function () {
+    it("vote(..., false) should decrease votes correctly", async function () {
       const {otherAccount, voting, votingToken, votingTokenSupply, owner} = await loadFixture(deployVotingAndTokenFixture);
       const message = hashProposalMessage("hello world");
       
