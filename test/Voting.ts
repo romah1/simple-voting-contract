@@ -202,6 +202,40 @@ describe("Voting", function () {
 
       await expect(voting.connect(otherAccount).vote(id, true)).to.be.revertedWith("Account has already voted");
     });
+
+    it("ProposalExecuted event with success:true should be emmited when reached enough votesFor", async function () {
+      const {otherAccount, voting, votingToken, votingTokenSupply, owner} = await loadFixture(deployVotingAndTokenFixture);
+      const message = hashProposalMessage("hello world");
+
+      const otherAccountVotes = votingTokenSupply / 2;
+      await votingToken.transfer(otherAccount.address, otherAccountVotes);
+      await votingToken.connect(otherAccount).delegate(otherAccount.address);
+      await votingToken.connect(owner).delegate(owner.address);
+
+      await voting.connect(owner).propose(message);
+      const id = await voting.latestProposalId();
+
+      await voting.connect(owner).vote(id, true);
+      await expect(voting.connect(otherAccount).vote(id, true)).to.emit(voting, "ProposalExecuted")
+        .withArgs(id, message, owner.address, otherAccountVotes * 2, 0, anyValue, anyValue, otherAccount.address, true);
+    });
+
+    it("ProposalExecuted event with success:false should be emmited when reached enough votesAgainst", async function () {
+      const {otherAccount, voting, votingToken, votingTokenSupply, owner} = await loadFixture(deployVotingAndTokenFixture);
+      const message = hashProposalMessage("hello world");
+
+      const otherAccountVotes = votingTokenSupply / 2;
+      await votingToken.transfer(otherAccount.address, otherAccountVotes);
+      await votingToken.connect(otherAccount).delegate(otherAccount.address);
+      await votingToken.connect(owner).delegate(owner.address);
+
+      await voting.connect(owner).propose(message);
+      const id = await voting.latestProposalId();
+
+      await voting.connect(owner).vote(id, false);
+      await expect(voting.connect(otherAccount).vote(id, false)).to.emit(voting, "ProposalExecuted")
+        .withArgs(id, message, owner.address, 0, otherAccountVotes * 2, anyValue, anyValue, otherAccount.address, false);
+    });
   });
 });
 

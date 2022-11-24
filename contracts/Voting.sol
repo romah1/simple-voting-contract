@@ -127,7 +127,7 @@ contract Voting {
 
   function executeProposalIfPossible(Proposal memory proposal) private {
     uint256 tokenPastTotalSupply = token.getPastTotalSupply(proposal.voteStart);
-    if (proposal.votesFor * 2 <= tokenPastTotalSupply && proposal.votesAgainst <= tokenPastTotalSupply) {
+    if (proposal.votesFor * 2 <= tokenPastTotalSupply && proposal.votesAgainst * 2 <= tokenPastTotalSupply) {
       return;
     }
 
