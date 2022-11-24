@@ -29,26 +29,26 @@ npx hardhat test
 ```
 ## Example output:
 ```
-➜  simple_voting_contract git:(master) ✗ npx hardhat test
+➜  simple_voting_contract git:(master) npx hardhat test
 
   Voting
     Deployment
-      ✔ VotingToken should have correct supply and decimals (889ms)
+      ✔ VotingToken should have correct supply and decimals (821ms)
       ✔ Voting should set correct token address, maxProposalsAllowed and proposalTimeToLive
     propose(...)
       ✔ propose(...) should emit ProposalCreated event
       ✔ propose(...) should emit event with correct args
       ✔ Proposal from contract should be equal proposal from ProposalCreated event
-      ✔ Maximum 3 active proposals should be allowed at a time
+      ✔ Maximum 3 active proposals should be allowed at a time (38ms)
       ✔ Oldest outdated proposal should be removed on propose(...) call
-      ✔ propose(...) should emit ProposalDiscarded event for outdated proposal (48ms)
+      ✔ propose(...) should emit ProposalDiscarded event for outdated proposal (49ms)
     vote(...) function
-      ✔ vote(..., true) increase votes correctly
-      ✔ vote(..., false) decrease votes correctly
+      ✔ vote(..., true) should increase votes correctly
+      ✔ vote(..., false) should decrease votes correctly
       ✔ Second vote from single account should be rejected
-      ✔ Token transfer should not add voting power (66ms)
-      ✔ ProposalExecuted event with success:true should be emmited when reached enough votesFor (49ms)
-      ✔ ProposalExecuted event with success:false should be emmited when reached enough votesAgainst (49ms)
+      ✔ Token transfer should not add voting power (62ms)
+      ✔ ProposalExecuted event with success:true should be emmited when reached enough votesFor (48ms)
+      ✔ ProposalExecuted event with success:false should be emmited when reached enough votesAgainst (46ms)
       ✔ VoteSubmitted event should be emited on successfull vote for call
       ✔ VoteSubmitted event should be emited on successfull vote against call
 ```
