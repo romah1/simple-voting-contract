@@ -3,15 +3,6 @@ import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 
-function hashProposalMessage(message: string): string {
-  return ethers.utils.keccak256(ethers.utils.formatBytes32String(message));
-}
-
-function proposalFromTuple(tuple: Array<any>) {
-  const [id, message, owner, votesFor, votesAgainst, voteStart, voteEnd] = tuple;
-  return {id, message, owner, votesFor, votesAgainst, voteStart, voteEnd};
-}
-
 describe("Voting", function () {
 
   async function deployVotingAndTokenFixture() {
@@ -19,17 +10,15 @@ describe("Voting", function () {
     const maxProposalsAllowed = 3;
     const proposalTimeToLive = 19725; // 3 days
 
-    const [owner, otherAccount] = await ethers.getSigners();
+    const [owner, otherAccount, thirdAccount] = await ethers.getSigners();
 
     const VotingToken = await ethers.getContractFactory("VotingToken", owner);
     const votingToken = await VotingToken.deploy(votingTokenSupply);
-    await votingToken.delegate(owner.address);
-    await votingToken.delegate(otherAccount.address);
 
     const Voting = await ethers.getContractFactory("Voting", owner);
     const voting = await Voting.deploy(votingToken.address);
 
-    return { votingToken, voting, owner, otherAccount, votingTokenSupply, maxProposalsAllowed, proposalTimeToLive };
+    return { votingToken, voting, owner, otherAccount, votingTokenSupply, maxProposalsAllowed, proposalTimeToLive, thirdAccount };
   }
 
   describe("Deployment", function () {
@@ -70,7 +59,8 @@ describe("Voting", function () {
       const voteStart = eventArgs[3];
       const voteEnd = eventArgs[4];
       
-      expect(proposalIdFromEvent).to.equals(await voting.hashMessage(message));
+      const proposalId = await voting.latestProposalId();
+      expect(proposalIdFromEvent).to.equals(proposalId);
       expect(messageFromEvent).to.equals(message);
       expect(ownerFromEvent).to.equals(owner.address);
       expect(voteEnd - voteStart).to.equals(proposalTimeToLive);
@@ -99,14 +89,6 @@ describe("Voting", function () {
       expect(proposal.voteEnd).to.equals(voteEnd);
     });
 
-    it("Active proposals with equal messages are forbidden", async function() {
-      const {voting} = await loadFixture(deployVotingAndTokenFixture);
-      const message = hashProposalMessage("hello world");
-
-      await voting.propose(message);
-      await expect(voting.propose(message)).to.be.revertedWith("Proposal already exists");
-    });
-
     it("Maximum 3 active proposals should be allowed at a time", async function() {
       const {voting} = await loadFixture(deployVotingAndTokenFixture);
       const messages = ["1", "2", "3"].map(hashProposalMessage);
@@ -121,10 +103,7 @@ describe("Voting", function () {
       const messages = ["1", "2", "3"].map(hashProposalMessage);
       await Promise.all(messages.map(message => voting.propose(message)));
       
-      await network.provider.request({
-        method: "hardhat_mine",
-        params: [ `0x${proposalTimeToLive}` ]
-      })
+      await mineBlocks(proposalTimeToLive);
       
       const fourthProposalMessage = hashProposalMessage("4");
       await voting.propose(fourthProposalMessage);
@@ -138,15 +117,15 @@ describe("Voting", function () {
       
       const otherAccountVotes = votingTokenSupply / 2;
       await votingToken.transfer(otherAccount.address, otherAccountVotes);
+      await votingToken.connect(otherAccount).delegate(otherAccount.address);
 
       await voting.connect(owner).propose(message);
-      const id = await voting.hashMessage(message);
+      const id = await voting.latestProposalId();
 
-      const votingPower = await votingToken.getVotes(otherAccount.address);
       await voting.connect(otherAccount).vote(id, true);
-      const {votesFor} = proposalFromTuple(await voting.getProposalByMessage(message));
-
-      expect(votesFor).to.equals(votingPower);
+      const {votesFor} = proposalFromTuple(await voting.getProposalById(id));
+      
+      expect(votesFor).to.equals(otherAccountVotes);
     });
 
     it("vote(..., false) decrease votes correctly", async function () {
@@ -155,15 +134,70 @@ describe("Voting", function () {
       
       const otherAccountVotes = votingTokenSupply / 2;
       await votingToken.transfer(otherAccount.address, otherAccountVotes);
+      await votingToken.connect(otherAccount).delegate(otherAccount.address);
 
       await voting.connect(owner).propose(message);
-      const id = await voting.hashMessage(message);
+      const id = await voting.latestProposalId();
 
-      const votingPower = await votingToken.getVotes(otherAccount.address);
       await voting.connect(otherAccount).vote(id, false);
-      const {votesAgainst} = proposalFromTuple(await voting.getProposalByMessage(message));
+      const {votesAgainst} = proposalFromTuple(await voting.getProposalById(id));
 
-      expect(votesAgainst).to.equals(votingPower);
+      expect(votesAgainst).to.equals(otherAccountVotes);
+    });
+
+    it("Second vote from single account should be rejected", async function () {
+      const {otherAccount, voting, votingToken, votingTokenSupply, owner} = await loadFixture(deployVotingAndTokenFixture);
+      const message = hashProposalMessage("hello world");
+      
+      const otherAccountVotes = votingTokenSupply / 2;
+      await votingToken.transfer(otherAccount.address, otherAccountVotes);
+
+      await voting.connect(owner).propose(message);
+      const id = await voting.latestProposalId();
+
+      await voting.connect(otherAccount).vote(id, true);
+      await expect(voting.connect(otherAccount).vote(id, true)).to.be.revertedWith("Account has already voted");
+    });
+
+    it("Token transfer should not add voting power", async function() {
+      const {otherAccount, voting, votingToken, votingTokenSupply, owner, thirdAccount} = await loadFixture(deployVotingAndTokenFixture);
+      const message = hashProposalMessage("hello world");
+      
+      const otherAccountVotes = votingTokenSupply / 2;
+      await votingToken.transfer(otherAccount.address, otherAccountVotes);
+      await votingToken.connect(otherAccount).delegate(otherAccount.address);
+
+      await voting.connect(owner).propose(message);
+      const id = await voting.latestProposalId();
+
+      await voting.connect(otherAccount).vote(id, true);
+      let {votesFor} = proposalFromTuple(await voting.getProposalById(id));
+      expect(votesFor).to.equals(otherAccountVotes);
+
+      await votingToken.connect(otherAccount).transfer(thirdAccount.address, otherAccountVotes);
+      await votingToken.connect(thirdAccount).delegate(thirdAccount.address);
+  
+      await voting.connect(thirdAccount).vote(id, true);
+      let {votesFor: votesForAferThirdAccountVote} = proposalFromTuple(await voting.getProposalById(id));
+      expect(votesForAferThirdAccountVote).to.equals(otherAccountVotes);
+
+      await expect(voting.connect(otherAccount).vote(id, true)).to.be.revertedWith("Account has already voted");
     });
   });
 });
+
+function hashProposalMessage(message: string): string {
+  return ethers.utils.keccak256(ethers.utils.formatBytes32String(message));
+}
+
+function proposalFromTuple(tuple: Array<any>) {
+  const [id, message, owner, votesFor, votesAgainst, voteStart, voteEnd] = tuple;
+  return {id, message, owner, votesFor, votesAgainst, voteStart, voteEnd};
+}
+
+async function mineBlocks(amount: number) {
+  network.provider.request({
+    method: "hardhat_mine",
+    params: [ `0x${amount}` ]
+  })
+}

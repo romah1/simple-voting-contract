@@ -37,7 +37,9 @@ contract Voting {
   
   IVotes public token;
   mapping(uint => Proposal) public proposals;
+  mapping(uint256 => mapping(address => bool)) votedForProposal;
   uint256[] public proposalIds;
+  uint256 public latestProposalId;
 
   constructor(IVotes _token) {
     token = _token;
@@ -53,23 +55,12 @@ contract Voting {
     return (proposal.id, proposal.message, proposal.owner, proposal.votesFor, proposal.votesAgainst, proposal.voteStart, proposal.voteEnd);
   }
 
-  function getProposalByMessage(bytes32 _message)
-    public
-    view
-    returns (uint256 proposalId, bytes32 message, address owner, uint256 votesFor, uint256 votesAgainst, uint256 voteStart, uint256 voteEnd) {
-      return getProposalById(hashMessage(_message));
-  }
-
-  function hashMessage(bytes32 message) public pure returns (uint256) {
-    return uint256(keccak256(abi.encode(message)));
-  }
-
   function propose(bytes32 message) public returns (uint256) {
     removeOldestProposalIfNeeded();
 
     require(proposalIds.length < MaxProposalsAllowed, "Max amount of proposals is already reached");
 
-    uint256 proposalId = hashMessage(message);
+    uint256 proposalId = ++latestProposalId;
 
     Proposal storage proposal = proposals[proposalId];
     require(proposal.voteStart == 0, "Proposal already exists");
@@ -100,6 +91,9 @@ contract Voting {
     Proposal storage proposal = proposals[proposalId];
     require(proposal.voteStart != 0, "Proposal does not exist");
 
+    require(!votedForProposal[proposalId][msg.sender], "Account has already voted");
+    votedForProposal[proposalId][msg.sender] = true;
+
     uint256 votes = token.getPastVotes(msg.sender, proposal.voteStart);
 
     if (isFor) {
@@ -119,7 +113,7 @@ contract Voting {
 
     for (uint i = 0; i < proposalIds.length; ++i) {
       if (proposalIds[i] == proposal.id) {
-        deleteProposalByIndexInProposalIds(i);
+        removeProposalByIdx(i);
 
         bool success;
         if (proposal.votesFor * 2 > tokenPastTotalSupply) {
@@ -148,14 +142,13 @@ contract Voting {
 
     for (uint i = 0; i < proposalIds.length; ++i) {
       if (!isProposalAlive(proposalIds[i])) {
-        deleteProposalByIndexInProposalIds(i);
+        removeProposalByIdx(i);
         return;
       }
     }
   }
 
-  function deleteProposalByIndexInProposalIds(uint256 idx) private {
-    delete proposals[proposalIds[idx]];
+  function removeProposalByIdx(uint256 idx) private {
     proposalIds[idx] = proposalIds[0];
     proposalIds.pop();
   }
