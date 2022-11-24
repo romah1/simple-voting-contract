@@ -3,8 +3,6 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/governance/utils/IVotes.sol";
 
-import "hardhat/console.sol";
-
 contract Voting {
   event ProposalCreated(
     uint256 id,
