@@ -235,6 +235,42 @@ describe("Voting", function () {
       await expect(voting.connect(otherAccount).vote(id, false)).to.emit(voting, "ProposalExecuted")
         .withArgs(id, message, owner.address, 0, otherAccountVotes * 2, anyValue, anyValue, otherAccount.address, false);
     });
+
+    it("VoteSubmitted event should be emited on successfull vote for call", async function () {
+      const {voting, votingToken, owner} = await loadFixture(deployVotingAndTokenFixture);
+      const message = hashProposalMessage("hello world");
+
+      await votingToken.connect(owner).delegate(owner.address);
+      await voting.connect(owner).propose(message);
+      const proposalId = await voting.latestProposalId();
+
+      await expect(voting.connect(owner).vote(proposalId, true)).to.emit(voting, "VoteSubmitted")
+        .withArgs(
+          proposalId,
+          owner.address,
+          await votingToken.balanceOf(owner.address),
+          true,
+          await votingToken.balanceOf(owner.address)
+        );
+    });
+
+    it("VoteSubmitted event should be emited on successfull vote against call", async function () {
+      const {voting, votingToken, owner} = await loadFixture(deployVotingAndTokenFixture);
+      const message = hashProposalMessage("hello world");
+
+      await votingToken.connect(owner).delegate(owner.address);
+      await voting.connect(owner).propose(message);
+      const proposalId = await voting.latestProposalId();
+
+      await expect(voting.connect(owner).vote(proposalId, false)).to.emit(voting, "VoteSubmitted")
+        .withArgs(
+          proposalId,
+          owner.address,
+          await votingToken.balanceOf(owner.address),
+          false,
+          await votingToken.balanceOf(owner.address)
+        );
+    });
   });
 });
 

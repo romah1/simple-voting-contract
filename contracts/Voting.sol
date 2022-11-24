@@ -14,6 +14,14 @@ contract Voting {
     uint256 voteEnd
   );
 
+  event VoteSubmitted(
+    uint256 proposalId,
+    address submitter,
+    uint256 votingPower,
+    bool isFor,
+    uint256 newVotesAmount
+  );
+
   event ProposalExecuted(
     uint256 id,
     bytes32 message,
@@ -83,7 +91,6 @@ contract Voting {
     uint256 proposalId = ++latestProposalId;
 
     Proposal storage proposal = proposals[proposalId];
-    require(proposal.voteStart == 0, "Proposal already exists");
 
     uint256 snapshot = block.number;
     uint256 deadline = snapshot + ProposalTimeToLive;
@@ -121,6 +128,14 @@ contract Voting {
     } else {
       proposal.votesAgainst += votes;
     }
+
+    emit VoteSubmitted(
+      proposalId,
+      msg.sender,
+      votes,
+      isFor,
+      isFor ? proposal.votesFor : proposal.votesAgainst
+    );
 
     executeProposalIfPossible(proposal);
   }
