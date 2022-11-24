@@ -108,6 +108,25 @@ describe("Voting", function () {
       const fourthProposalMessage = hashProposalMessage("4");
       await voting.propose(fourthProposalMessage);
     });
+
+    it("propose(...) should emit ProposalDiscarded event for outdated proposal", async function () {
+      const {otherAccount, voting, votingToken, votingTokenSupply, owner, proposalTimeToLive} = await loadFixture(deployVotingAndTokenFixture);
+      const message = hashProposalMessage("hello world");
+
+      const otherAccountVotes = votingTokenSupply / 2;
+      await votingToken.transfer(otherAccount.address, otherAccountVotes);
+      await votingToken.connect(otherAccount).delegate(otherAccount.address);
+
+      await voting.connect(owner).propose(message);
+      const firstProposalId = await voting.latestProposalId();
+
+      await voting.connect(otherAccount).vote(firstProposalId, true);
+
+      mineBlocks(proposalTimeToLive);
+
+      await expect(voting.connect(owner).propose(message)).to.emit(voting, "ProposalDiscarded")
+        .withArgs(firstProposalId, message, owner.address, otherAccountVotes, 0, anyValue, anyValue);
+    });
   });
 
   describe("vote(...) function", function () {
