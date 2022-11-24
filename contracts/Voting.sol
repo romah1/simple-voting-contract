@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import './SimpleVotingToken.sol';
 import "@openzeppelin/contracts/governance/utils/IVotes.sol";
 
 import "hardhat/console.sol";
@@ -27,10 +26,10 @@ contract Voting {
 
     uint256 id;
     address owner;
-    uint256 voteStart;
-    uint256 voteEnd;
     uint256 votesFor;
     uint256 votesAgainst;
+    uint256 voteStart;
+    uint256 voteEnd;
   }
 
   uint constant public MaxProposalsAllowed = 3;
@@ -44,12 +43,33 @@ contract Voting {
     token = _token;
   }
 
+  function getProposalById(uint256 _id)
+    public
+    view
+    returns (uint256 id, bytes32 message, address owner, uint256 votesFor, uint256 votesAgainst, uint256 voteStart, uint256 voteEnd) {
+    Proposal memory proposal = proposals[_id];
+    require(proposal.voteStart != 0, "Proposal does not exist");
+
+    return (proposal.id, proposal.message, proposal.owner, proposal.votesFor, proposal.votesAgainst, proposal.voteStart, proposal.voteEnd);
+  }
+
+  function getProposalByMessage(bytes32 _message)
+    public
+    view
+    returns (uint256 proposalId, bytes32 message, address owner, uint256 votesFor, uint256 votesAgainst, uint256 voteStart, uint256 voteEnd) {
+      return getProposalById(hashMessage(_message));
+  }
+
+  function hashMessage(bytes32 message) public pure returns (uint256) {
+    return uint256(keccak256(abi.encode(message)));
+  }
+
   function propose(bytes32 message) public returns (uint256) {
     removeOldestProposalIfNeeded();
 
     require(proposalIds.length < MaxProposalsAllowed, "Max amount of proposals is already reached");
 
-    uint256 proposalId = hashProposal(message);
+    uint256 proposalId = hashMessage(message);
 
     Proposal storage proposal = proposals[proposalId];
     require(proposal.voteStart == 0, "Proposal already exists");
@@ -119,10 +139,6 @@ contract Voting {
       }
     }
     revert("Failed to find proposalId in proposalIds array");
-  }
-
-  function hashProposal(bytes32 message) public pure returns (uint256) {
-    return uint256(keccak256(abi.encode(message)));
   }
 
   function removeOldestProposalIfNeeded() private {

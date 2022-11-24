@@ -7,6 +7,11 @@ function hashProposalMessage(message: string): string {
   return ethers.utils.keccak256(ethers.utils.formatBytes32String(message));
 }
 
+function proposalFromTuple(tuple: Array<any>) {
+  const [id, message, owner, votesFor, votesAgainst, voteStart, voteEnd] = tuple;
+  return {id, message, owner, votesFor, votesAgainst, voteStart, voteEnd};
+}
+
 describe("Voting", function () {
 
   async function deployVotingAndTokenFixture() {
@@ -18,6 +23,8 @@ describe("Voting", function () {
 
     const VotingToken = await ethers.getContractFactory("VotingToken", owner);
     const votingToken = await VotingToken.deploy(votingTokenSupply);
+    await votingToken.delegate(owner.address);
+    await votingToken.delegate(otherAccount.address);
 
     const Voting = await ethers.getContractFactory("Voting", owner);
     const voting = await Voting.deploy(votingToken.address);
@@ -120,6 +127,42 @@ describe("Voting", function () {
       
       const fourthProposalMessage = hashProposalMessage("4");
       await voting.propose(fourthProposalMessage);
+    });
+  });
+
+  describe("vote(...) function", function () {
+    it("vote(..., true) increase votes correctly", async function () {
+      const {otherAccount, voting, votingToken, votingTokenSupply, owner} = await loadFixture(deployVotingAndTokenFixture);
+      const message = hashProposalMessage("hello world");
+      
+      const otherAccountVotes = votingTokenSupply / 2;
+      await votingToken.transfer(otherAccount.address, otherAccountVotes);
+
+      await voting.connect(owner).propose(message);
+      const id = await voting.hashMessage(message);
+
+      const votingPower = await votingToken.getVotes(otherAccount.address);
+      await voting.connect(otherAccount).vote(id, true);
+      const {votesFor} = proposalFromTuple(await voting.getProposalByMessage(message));
+
+      expect(votesFor).to.equals(votingPower);
+    });
+
+    it("vote(..., false) decrease votes correctly", async function () {
+      const {otherAccount, voting, votingToken, votingTokenSupply, owner} = await loadFixture(deployVotingAndTokenFixture);
+      const message = hashProposalMessage("hello world");
+      
+      const otherAccountVotes = votingTokenSupply / 2;
+      await votingToken.transfer(otherAccount.address, otherAccountVotes);
+
+      await voting.connect(owner).propose(message);
+      const id = await voting.hashMessage(message);
+
+      const votingPower = await votingToken.getVotes(otherAccount.address);
+      await voting.connect(otherAccount).vote(id, false);
+      const {votesAgainst} = proposalFromTuple(await voting.getProposalByMessage(message));
+
+      expect(votesAgainst).to.equals(votingPower);
     });
   });
 });
