@@ -69,8 +69,9 @@ describe("Voting", function () {
       const ownerFromEvent = eventArgs[2];
       const voteStart = eventArgs[3];
       const voteEnd = eventArgs[4];
-
-      expect(message).to.equals(messageFromEvent);
+      
+      expect(proposalIdFromEvent).to.equals(await voting.hashMessage(message));
+      expect(messageFromEvent).to.equals(message);
       expect(ownerFromEvent).to.equals(owner.address);
       expect(voteEnd - voteStart).to.equals(proposalTimeToLive);
     });
